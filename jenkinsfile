@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "maven-3.6.3"
+    }
+  environment{
+      SONARSERVER = 'sonar-server'
+      SONARSCANNER = 'sonar-scanner'
+  }
+    stages {
+        stage('git checkout') {
+            steps {
+                
+               git 'https://github.com/dhal9901/sonar-scanning-examples.git'
+
+            }
+
+           
+         }
+         stage('unit testing') {
+            steps {
+                
+                sh '''cd sonarqube-scanner-maven/maven-multimodule/
+ mvn test '''
+
+            }
+
+         }
+          stage('intergation testing') {
+            steps {
+                
+              // sh "mvn verify -DskipUnitTests"
+               sh '''cd sonarqube-scanner-maven/maven-multimodule/
+ mvn verify -DskipUnitTests '''
+
+            }
+
+         }
+         stage('maven  build') {
+            steps {
+                
+             //  sh "mvn clean install"
+                            sh '''cd sonarqube-scanner-maven/maven-multimodule/
+ mvn clean install '''
+
+
+            }
+
+         }
+         stage('check style'){
+             steps{
+                //sh "mvn checkstyle:checkstyle"
+                 sh '''cd sonarqube-scanner-maven/maven-multimodule/
+                 mvn checkstyle:checkstyle
+  '''
+
+                recordIssues(tools: [checkStyle()])
+             }
+             
+         }
+        stage('build && SonarQube analysis') {
+            environment {
+                scannerHome = tool "${SONARSCANNER}"
+            }
+            steps {
+                withSonarQubeEnv(installationName: "${SONARSERVER}") {
+                   
+                 sh '''cd sonarqube-scanner-maven/maven-multimodule/
+ mvn clean package sonar:sonar'''
+            }
+        }
+      } 
+      stage("Quality Gate") {
+            steps {
+              timeout(time: 1, unit: 'HOURS') {
+                waitForQualityGate abortPipeline: true
+              }
+            }
+          }
+    }  
+}
+
+      
+   
+
+
